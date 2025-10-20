@@ -1,28 +1,40 @@
 import os
-from dotenv import load_dotenv
+import inspect
 import vertexai
 from vertexai.preview.vision_models import ImageGenerationModel
 
-load_dotenv()
+def init_vertex():
+    project = os.getenv("GCP_PROJECT_ID")
+    location = os.getenv("GCP_LOCATION", "us-central1")
+    if not project:
+        raise RuntimeError("Missing env GCP_PROJECT_ID")
+    vertexai.init(project=project, location=location)
 
-PROJECT_ID = os.getenv("GCP_PROJECT_ID")
-LOCATION   = os.getenv("GCP_LOCATION", "us-central1")
-CRED       = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-
-assert PROJECT_ID, "GCP_PROJECT_ID is required"
-assert CRED and os.path.exists(CRED), "GOOGLE_APPLICATION_CREDENTIALS not found"
-
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-
-def generate_imagen(prompt: str, size="1024x1024", out_path="test-imagen3.jpg"):
-    w, h = map(int, size.split("x"))
+def generate_image(prompt: str, size: str = "1024x1024") -> bytes:
+    """Generate one image and return JPEG/PNG bytes."""
     model = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
-    res = model.generate_images(prompt=prompt, number_of_images=1, size=f"{w}x{h}", safety_filter_level="block_few")
-    img = res.images[0]._image_bytes
-    with open(out_path, "wb") as f:
-        f.write(img)
-    return out_path
 
-if __name__ == "__main__":
-    p = "A futuristic smart kitchen with high-tech appliances, studio lighting, product render."
-    print("✅ Saved:", generate_imagen(p))
+    # 解析 size
+    try:
+        w, h = [int(x) for x in size.lower().split("x")]
+    except Exception:
+        w, h = 1024, 1024
+
+    # 读取函数签名，决定用哪个参数名
+    sig = inspect.signature(model.generate_images).parameters
+    kwargs = dict(prompt=prompt, number_of_images=1, safety_filter_level="block_few")
+
+    if "size" in sig:
+        kwargs["size"] = f"{w}x{h}"
+    elif "image_dimensions" in sig:
+        kwargs["image_dimensions"] = (w, h)
+    elif "aspect_ratio" in sig:
+        # 退而求其次：用长宽比；仅支持常见比例
+        ratio = f"{w}:{h}"
+        if ratio not in {"1:1", "16:9", "9:16", "4:3", "3:4"}:
+            ratio = "1:1"
+        kwargs["aspect_ratio"] = ratio
+    # 若都没有，则使用 SDK 默认尺寸
+
+    res = model.generate_images(**kwargs)
+    return res.images[0]._image_bytes
