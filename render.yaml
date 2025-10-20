@@ -2,7 +2,7 @@ services:
   - type: web
     name: ai-vertex
     env: python
-    plan: free
+    plan: hobby
     buildCommand: |
       pip install -r requirements.txt
       python - <<'PY'
