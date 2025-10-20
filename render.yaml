@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ai-vertex
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GCP_PROJECT_ID
+        sync: false
+      - key: GCP_LOCATION
+        value: us-central1
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /tmp/gcp-key.json
+      - key: GCP_KEY_B64
+        sync: false
+    preDeployCommand: |
+      python - <<'PY'
+      import os, base64, pathlib
+      b64 = os.getenv("GCP_KEY_B64")
+      if not b64:
+        raise SystemExit("Missing GCP_KEY_B64")
+      pathlib.Path("/tmp/gcp-key.json").write_bytes(base64.b64decode(b64))
+      print(">> Wrote /tmp/gcp-key.json")
+      PY
