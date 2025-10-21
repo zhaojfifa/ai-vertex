@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from app.vertex_client import generate_image
 
@@ -28,17 +28,19 @@ def healthz() -> Dict[str, bool]:
 async def generate_endpoint(body: Dict[str, Any] = Body(...)) -> Response:
     """Generate an image given a JSON payload and return it as image/jpeg."""
     if not isinstance(body, dict):
-        return JSONResponse(status_code=400, content={"error": "Invalid JSON payload"})
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
     prompt = (body.get("prompt") or "").strip()
     if not prompt:
-        return JSONResponse(status_code=400, content={"error": "prompt is required"})
+        raise HTTPException(status_code=400, detail="prompt is required")
 
     params = {key: value for key, value in body.items() if key != "prompt"}
 
     try:
         image_bytes = generate_image(prompt, **params)
-    except Exception as exc:  # pragma: no cover - surface error to client
-        return JSONResponse(status_code=400, content={"error": str(exc)})
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - surface unexpected errors
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return Response(content=image_bytes, media_type="image/jpeg")
