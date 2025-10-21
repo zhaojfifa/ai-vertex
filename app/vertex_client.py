@@ -20,6 +20,13 @@ _ASPECT_RATIO_VALUES = {
     "4:3": 4 / 3,
     "3:4": 3 / 4,
 }
+_ALLOWED_PARAMS = {
+    "negative_prompt",
+    "safety_filter_level",
+    "person_generation",
+    "language",
+    "number_of_images",
+}
 
 
 def _normalize_params(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -55,7 +62,8 @@ def _normalize_params(payload: Dict[str, Any]) -> Dict[str, Any]:
     for key in ("size", "image_dimensions", "width", "height"):
         params.pop(key, None)
 
-    for key, value in params.items():
+    for key in _ALLOWED_PARAMS:
+        value = params.get(key)
         if value is not None:
             normalized[key] = value
 
